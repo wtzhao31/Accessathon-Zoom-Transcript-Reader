@@ -8,3 +8,7 @@ Caption: Zoom transcript taken from an actual ITP 265 class from the University 
 
 <img width="995" alt="Screen Shot 2021-05-26 at 8 29 38 PM" src="https://user-images.githubusercontent.com/84831514/119761679-19452880-be61-11eb-8fe5-379bdd7e2790.png">
 
+Screenshot of the key word search:
+
+<img width="998" alt="Screen Shot 2021-05-26 at 8 31 14 PM" src="https://user-images.githubusercontent.com/84831514/119761831-645f3b80-be61-11eb-9b36-04da8088c993.png">
+
