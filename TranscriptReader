@@ -1,0 +1,319 @@
+package Accessathon;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.PrintWriter;
+import java.util.LinkedList;
+import java.util.Scanner;
+
+import FinalProjectZhaoW.Cell;
+import javafx.application.Application;
+import javafx.geometry.Insets;
+import javafx.scene.Node;
+import javafx.scene.Scene;
+import javafx.scene.layout.FlowPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
+import javafx.stage.Stage;
+import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.TextField;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+
+
+public class Transcribe extends Application{
+	private Scene scene;
+	private VBox root;
+	private ComboBox<String> cb;
+	private VBox content;
+	private ScrollPane sp;
+	private VBox splitScreenLeft;
+	private VBox splitScreenRight;
+	
+	private Button filterSpeaker;
+	private Button exportButton;
+	
+	private static final String MEETING = "ITP_265_Sample"; // name of file that is imported
+	private static final String FILEOUT = MEETING + "_filtered.txt"; // name of file that is exported
+	public static final int WIDTH = 1000; // width of screen
+	public static final int HEIGHT = 1000; // height of screen
+	
+	private LinkedList<String> speakers = new LinkedList<String>();
+	private LinkedList<NoteText> quotesList = new LinkedList<NoteText>();
+	private LinkedList<String> keyWordList = new LinkedList<String>();
+	
+	private NoteText currentSpeaker = new NoteText(); // empty NoteText object. Stores the current Speaker object
+	
+	public static void main(String[] args) {
+		launch(args);
+	}
+	
+	public void start(Stage stage) {
+		root = new VBox();
+		scene = new Scene(root,WIDTH,HEIGHT);
+		stage.setScene(scene);
+		stage.show();
+		stage.setTitle("Transcribe");
+		scanForSpeakers();
+		setUp();
+		readFile();
+	}
+	
+	public void scanForSpeakers() {
+		speakers.add("All Speakers");
+		Scanner sc  = null;
+		try {
+			sc = new Scanner(new File(MEETING + ".txt"));
+			while(sc.hasNextLine()) {
+				String s = sc.nextLine();
+				if (sc.hasNextInt()) {
+					String[] values = s.split(": ");
+					try {
+						String name = values[0]; // the name of the person who spoke
+						String trash = values[1]; // get rid of excess transcription. Will trigger an error and go to the catch block
+						int counter = 0;
+						for (String str : speakers) { // loop through the list of speakers
+							if (!str.equals(name)) { // for everytime there is a name in the list that isn't equal to this name, add 1
+								counter++;
+							}
+						}
+						if (counter == speakers.size()) { // if amount of different names is the same as the size of the speakers list, then add the new name to the list
+							speakers.add(name);
+						}
+					}
+					catch(Exception e) {
+					}
+				}
+			}
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public void setUp() {
+		root.setPadding(new Insets(20,20,20,20)); // outer edge
+		
+		HBox titleNode = new HBox(); // top line, sets the title
+		root.getChildren().add(titleNode);
+		NoteText title = new NoteText(MEETING + " Zoom Transcript", 37, FontWeight.EXTRA_BOLD);
+		titleNode.setPadding(new Insets(0,0,20,0));
+		titleNode.getChildren().add(title);
+		
+		HBox splitScreen = new HBox(); // split the screen into a left and right half
+		root.getChildren().add(splitScreen);
+		
+		splitScreenLeft = new VBox(); // left side: notes inside the ScrollPane
+		splitScreenLeft.setPrefSize(WIDTH * 0.6, HEIGHT * 0.75);
+		splitScreenLeft.setPadding(new Insets(0,20,0,0));
+		splitScreenRight = new VBox(); // right side: all the information, functionalities, etc.
+		splitScreen.getChildren().addAll(splitScreenLeft,splitScreenRight);
+		
+		content = new VBox(); // the ScrollPane with the notes
+		sp = new ScrollPane();
+		sp.setContent(content);
+		sp.setMinWidth(WIDTH * 0.6);
+		sp.setMinHeight(50);
+		sp.setMaxHeight(800);
+		sp.vbarPolicyProperty().setValue(ScrollPane.ScrollBarPolicy.ALWAYS);
+		sp.setPadding(new Insets(15,15,15,15)); // padding on the inside
+		splitScreenLeft.getChildren().add(sp);
+		
+		VBox infoNode = new VBox(); // all the information about the meeting
+		splitScreenRight.getChildren().add(infoNode);
+		NoteText info = new NoteText("Meeting Description ", 25, FontWeight.BOLD);
+		NoteText date = new NoteText("Date: May 12, 2021", 20, FontWeight.THIN);
+		NoteText length = new NoteText("Length: 48 minutes", 20, FontWeight.THIN);
+		infoNode.setPadding(new Insets(0,0,15,0));
+		infoNode.getChildren().addAll(info,date,length); 
+		
+		FlowPane cbNode = new FlowPane(); // FILTER BY SPEAKER
+		splitScreenRight.getChildren().add(cbNode);
+		NoteText filter = new NoteText("Filter by Speaker:  ", 20, FontWeight.BOLD);
+		cb = new ComboBox<String>();
+		cb.getItems().addAll(speakers); // add all the speakers to the ComboBox
+		cb.setPromptText("Select speaker");
+		cb.setAccessibleText("Dropdown menu. Click this to select which speaker you would like to filter by.");
+		filterSpeaker = new Button("Filter");
+		filterSpeaker.setOnAction(e->{filterBySpeaker(cb.getValue());});
+		filterSpeaker.setAccessibleText("Filter speaker button. Click this to filter by speaker selected in previous drop-down menu.");
+		cbNode.getChildren().addAll(filter,cb,filterSpeaker);
+		cbNode.setPadding(new Insets(0,0,15,0));
+
+		FlowPane keyWordNode = new FlowPane(); // FILTER BY KEY WORD
+		splitScreenRight.getChildren().add(keyWordNode);
+		NoteText keyWord = new NoteText("Key Word Search: ", 20, FontWeight.BOLD);
+		TextField inputKeyWord = new TextField("Input words");
+		Button add = new Button("Add");
+		Button clear = new Button("Clear");
+		Button search =  new Button("Search");
+		keyWordNode.getChildren().addAll(keyWord,inputKeyWord,add,clear,search);
+		keyWordNode.setPadding(new Insets(0,0,10,0)); // padding
+		FlowPane wordBank = new FlowPane();
+		wordBank.setPrefSize(100,100);
+		splitScreenRight.getChildren().add(wordBank);
+		add.setOnAction(e->{ // add word to the wordBank
+			String word = inputKeyWord.getText();
+			NoteText nt = new NoteText(word,15,FontWeight.NORMAL);
+			keyWordList.add(word.toLowerCase());
+			wordBank.getChildren().add(nt);	
+		});
+		clear.setOnAction(e->{ // clear the wordBank
+			wordBank.getChildren().clear();
+			keyWordList.clear();
+		});
+		search.setOnAction(e->{ // search
+			filterByKeyWord();
+		});
+		wordBank.setPadding(new Insets(0,0,15,0));
+		
+		FlowPane exportNode = new FlowPane();
+		splitScreenRight.getChildren().add(exportNode);
+		NoteText export = new NoteText("Export as File Type:  ", 20, FontWeight.BOLD);
+		ComboBox<String> exportOptions = new ComboBox<String>(); // TODO: implement this ComboBox!
+		exportOptions.getItems().addAll("pdf","word doc","txt","OneNote");
+		exportOptions.setPromptText("Select file type");
+		exportOptions.setAccessibleText("Dropdown menu. Click this to select which file type you would like to export the transcript by.");
+		exportButton = new Button("Export");
+		exportButton.setOnAction(e->{writeFileOut();});
+		exportButton.setAccessibleText("Export button. Click this to export the transcript to the file type selected in the previous drop down menu.");
+		exportNode.getChildren().addAll(export,exportOptions,exportButton);
+		exportNode.setPadding(new Insets(0,0,15,0));
+		
+		/*
+		addFunctionality("Filter by Speaker: ",speakers,"Select speaker","Dropdown menu. Click this to select which speaker you would like to filter by.","Filter",e->{filterBySpeaker(cb.getValue());},"Filter speaker button. Click this to filter by speaker selected in previous drop-down menu.");
+		String[] fileTypes = {"pdf","word doc","txt","OneNote"};
+		LinkedList<String> fileTypes2 = new LinkedList<>();
+		for (int i = 0; i < fileTypes.length; i++) { fileTypes2.add(fileTypes[i]); }		
+		addFunctionality("Export as File Type: ",fileTypes2,"Select file type","Dropdown menu. Click this to select which file type you would like to export the transcript by.","Export",e->{writeFileOut();},"Export button. Click this to export the transcript to the file type selected in the previous drop down menu.");
+		 */
+	}
+	
+	public void filterByKeyWord() {
+		//content.getChildren().add(currentSpeaker); // put the speaker at the top
+		content.getChildren().clear();
+		for (NoteText nt : quotesList) {
+			String quote = nt.getText();
+			quote.strip(); // strip ends
+			quote.trim();
+			quote.toLowerCase(); // make everything lower case
+			String[] values = quote.split(" "); // split by a space
+			for (String s : values) {
+				for (String keyWord : keyWordList) {
+					if (s.equals(keyWord)) {
+						String speaker = nt.getSpeaker();
+						NoteText speakerBig = new NoteText(speaker,20,FontWeight.BOLD);
+						//if (!currentSpeaker.getText().equals(speakerBig.getText())) {
+							content.getChildren().add(speakerBig); // add the name of the speaker only if the speech above is a different person speaking
+						//}
+						currentSpeaker = speakerBig;
+						content.getChildren().add(nt);
+					}
+				}
+			}
+		}
+	}
+	
+	// Text, combobox, button
+	// Doesn't work
+	// TODO: delete
+	public void addFunctionality(String text, LinkedList<String> options, String promptText, String accessText, String buttonText, EventHandler<ActionEvent> eh, String buttonAccessText) {
+		FlowPane fp = new FlowPane();
+		splitScreenRight.getChildren().add(fp);
+		NoteText nt = new NoteText(text, 20, FontWeight.BOLD); // create new NoteText object with String text that is passed in
+		ComboBox<String> cbs = new ComboBox<String>();
+		cbs.getItems().addAll(options);
+		cbs.setPromptText(promptText);
+		cbs.setAccessibleText(accessText);
+		Button b = new Button(buttonText);
+		b.setOnAction(eh);
+		b.setAccessibleText(buttonAccessText);
+		fp.getChildren().addAll(nt,cbs,b); // add the NoteText, ComboBox, and the Button to the FlowPane
+		fp.setPadding(new Insets(0,0,15,0));
+	}
+	
+	public void readFile() {
+		quotesList.clear();
+		Scanner sc  = null;
+		try {
+			sc = new Scanner(new File(MEETING + ".txt"));
+			while(sc.hasNextLine()) {
+				String s = sc.nextLine();
+				if (sc.hasNextInt()) {
+					String[] values = s.split(": ");
+					try {
+						String name = values[0]; // the name of the person who spoke
+						String quote = values[1]; // what they said
+						
+						NoteText nameText = new NoteText(name,20,FontWeight.BOLD); 
+						nameText.setType(true);
+						nameText.setAccessibleText("Speaker, " + name); // Screen reader/voice over: tells the user that this is a person talking
+						if (!currentSpeaker.getText().equals(nameText.getText())) { // prevents it from displaying the speaker's name over and over again
+							content.getChildren().add(nameText);
+						}
+						currentSpeaker = nameText; // set the current speaker, so it doesn't display their name again the next time they say something
+					
+						NoteText quoteText = new NoteText(quote + "\n",15,FontWeight.NORMAL);
+						quoteText.setAccessibleText("Speech, " + quote); // Screenreader/voice over: tells the user that this is something the person saaid
+						quoteText.setType(false);
+						quoteText.setSpeaker(currentSpeaker.getText()); // assign a speaker to each quoteText object
+						quotesList.add(quoteText); // add that quoteText NoteText object to the overall list
+						content.getChildren().add(quoteText);
+					} 
+					catch(Exception e) {
+					}
+				}
+			}
+		}
+		catch(Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	// filters the Transcript by speaker
+	public void filterBySpeaker(String s) {
+		content.getChildren().clear();
+		if (s.equals("All Speakers")) {
+			readFile();
+		}
+		else {
+			NoteText onlySpeaker = new NoteText(s,20,FontWeight.BOLD);   
+			currentSpeaker = onlySpeaker;
+			onlySpeaker.setType(true);
+			content.getChildren().add(onlySpeaker);
+			for (NoteText nt : quotesList) { // loop through the NoteText objects inside of the quotesList
+				if (nt.getSpeaker().equals(s)) { // find which quotes were said by the speaker
+					content.getChildren().add(nt); // add to the content ScrollPane
+				}
+			}
+		}
+	}
+	
+	// writes whatever is on the screen out to a .txt file
+	public void writeFileOut() {
+		try {
+			FileOutputStream fos = new FileOutputStream(FILEOUT);
+			PrintWriter pw = new PrintWriter(fos);
+			int num = content.getChildren().size();
+			for (int i = 0; i < num; i++) {
+				NoteText nt = (NoteText) content.getChildren().get(i); // type cast that bad boi
+				if (!nt.getType()) { // if nt.getType() is false, that means that it is a speech element. 
+					pw.println("-" + nt.getText()); // add a "bullet point" to the speech
+				} else {
+					pw.println(nt.getText());
+
+				}
+			}
+			pw.close();
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+	}
+}
